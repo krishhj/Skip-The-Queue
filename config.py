@@ -1,5 +1,10 @@
 import os
 from datetime import timedelta
+data_dir = os.environ.get('DATA_DIR')
+if data_dir:
+    db_path = os.path.join(data_dir, 'skipthequeue.db')
+else:
+    db_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'skipthequeue.db')
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'

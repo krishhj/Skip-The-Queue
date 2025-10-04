@@ -28,7 +28,7 @@
                             {% elif order.order_status == 'confirmed' %}bg-primary
                             {% elif order.order_status == 'preparing' %}bg-warning
                             {% elif order.order_status == 'ready' %}bg-success
-                            {% elif order.order_status == 'completed' %}bg-secondary
+                            {% elif order.order_status == 'picked_up' %}bg-secondary
                             {% else %}bg-danger{% endif %}">
                             {{ order.order_status|upper }}
                         </span>
@@ -69,18 +69,72 @@
     <div class="modal fade" id="qrModal{{ order.id }}" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header gradient-card-1 text-white">
                     <h5 class="modal-title">Order #{{ order.order_number }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body text-center">
-                    <img src="{{ url_for('static', filename=order.qr_code_path.replace('static/', '')) }}" 
-                         alt="Order QR Code" class="img-fluid">
-                    <p class="mt-3 text-muted">Show this QR code at pickup</p>
+                <div class="modal-body text-center p-4">
+                    <p class="text-muted mb-3">Show this QR code at pickup</p>
+                    
+                    <!-- QR Code Image -->
+                    <div class="qr-code-container mb-3">
+                        <img src="/{{ order.qr_code_path }}" 
+                             alt="Order QR Code" 
+                             class="img-fluid" 
+                             style="max-width: 300px; border-radius: 12px;"
+                             onerror="this.style.display='none'; document.getElementById('qr-error-{{ order.id }}').style.display='block';">
+                        
+                        <!-- Error fallback -->
+                        <div id="qr-error-{{ order.id }}" style="display: none;" class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> QR Code image not available
+                        </div>
+                    </div>
+                    
+                    <!-- Order Number Fallback -->
+                    <div class="p-3 bg-light rounded">
+                        <p class="mb-1"><strong>Order Number:</strong></p>
+                        <h4 class="text-primary mb-2">{{ order.order_number }}</h4>
+                        <small class="text-muted">Show this to vendor if QR doesn't work</small>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <p class="mb-1"><strong>Pickup Time:</strong> {{ order.pickup_time }}</p>
+                        <p class="mb-0"><strong>Status:</strong> 
+                            <span class="badge 
+                                {% if order.order_status == 'placed' %}bg-info
+                                {% elif order.order_status == 'confirmed' %}bg-primary
+                                {% elif order.order_status == 'preparing' %}bg-warning
+                                {% elif order.order_status == 'ready' %}bg-success
+                                {% elif order.order_status == 'picked_up' %}bg-secondary
+                                {% else %}bg-danger{% endif %}">
+                                {{ order.order_status|upper }}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="printQR{{ order.id }}()" class="btn btn-outline-primary">
+                        <i class="bi bi-printer"></i> Print
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
+    
+    <script>
+    function printQR{{ order.id }}() {
+        const printContent = document.querySelector('#qrModal{{ order.id }} .modal-body').innerHTML;
+        const printWindow = window.open('', '', 'height=600,width=800');
+        printWindow.document.write('<html><head><title>Order #{{ order.order_number }}</title>');
+        printWindow.document.write('<style>body{text-align:center;padding:20px;font-family:Arial,sans-serif;}</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(printContent);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
+    </script>
     {% endif %}
     {% endfor %}
 </div>
@@ -94,4 +148,38 @@
     </a>
 </div>
 {% endif %}
+
+<!-- Add some custom styling for the QR modal -->
+<style>
+.modal-header.gradient-card-1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.qr-code-container {
+    position: relative;
+    display: inline-block;
+    padding: 20px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.qr-code-container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 18px;
+    z-index: -1;
+    animation: rotate-border 3s linear infinite;
+}
+
+@keyframes rotate-border {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
 {% endblock %}
