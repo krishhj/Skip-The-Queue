@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - SkipTheQueue{% endblock %}
+
+{% block content %}
+<div class="animate-fadeIn">
+    <h2 class="mb-4 text-gradient"><i class="bi bi-graph-up"></i> Analytics & Reports</h2>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card gradient-card-1">
+                <div class="card-body text-center text-white">
+                    <i class="bi bi-currency-rupee display-4 mb-3"></i>
+                    <h2>₹{{ "%.2f"|format(total_revenue) }}</h2>
+                    <p class="mb-0">Total Revenue</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card gradient-card-2">
+                <div class="card-body text-center text-white">
+                    <i class="bi bi-bag-check display-4 mb-3"></i>
+                    <h2>{{ orders|length }}</h2>
+                    <p class="mb-0">Total Orders</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card gradient-card-3">
+                <div class="card-body text-center text-white">
+                    <i class="bi bi-graph-up-arrow display-4 mb-3"></i>
+                    <h2>₹{{ "%.0f"|format(total_revenue / orders|length) if orders|length > 0 else 0 }}</h2>
+                    <p class="mb-0">Average Order Value</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Peak Hours Chart -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <h5 class="chart-title"><i class="bi bi-clock-history"></i> Peak Hours (Last 7 Days)</h5>
+                <canvas id="peakHoursChart" height="80"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <h5 class="chart-title"><i class="bi bi-pie-chart"></i> Top Items</h5>
+                <canvas id="topItemsChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slot Utilization -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="chart-container">
+                <h5 class="chart-title"><i class="bi bi-bar-chart"></i> Today's Slot Utilization</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time Slot</th>
+                                <th>Capacity</th>
+                                <th>Booked</th>
+                                <th>Utilization</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for slot in slot_utilization_data %}
+                            <tr>
+                                <td><i class="bi bi-clock"></i> {{ slot.time }}</td>
+                                <td>{{ slot.capacity }}</td>
+                                <td>{{ slot.booked }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="utilization-bar" style="width: 100px;">
+                                            <div class="utilization-fill {{ 'high' if slot.utilization > 80 else 'medium' if slot.utilization > 50 else 'low' }}" 
+                                                 style="width: {{ slot.utilization }}%"></div>
+                                        </div>
+                                        <span>{{ slot.utilization }}%</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if slot.utilization > 80 %}
+                                        <span class="badge bg-danger">High</span>
+                                    {% elif slot.utilization > 50 %}
+                                        <span class="badge bg-warning">Medium</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Low</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Waste Prevention Metrics -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="sustainability-card">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center">
+                        <div class="sustainability-icon mx-auto">
+                            <i class="bi bi-recycle"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <h4 class="mb-3" style="color: #065f46;">♻️ Sustainability Metrics</h4>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="impact-number">{{ waste_metrics.weekly_orders }}</div>
+                                <div class="impact-label">orders this week</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="impact-number">{{ waste_metrics.weekly_kg_saved }}</div>
+                                <div class="impact-label">kg waste prevented</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="impact-number">{{ orders|length }}</div>
+                                <div class="impact-label">total orders served</div>
+                            </div>
+                        </div>
+                        <p class="mt-3 mb-0 small" style="color: #047857;">
+                            {{ waste_metrics.message }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-3"><i class="bi bi-receipt"></i> Recent Transactions</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Customer</th>
+                                    <th>Date</th>
+                                    <th>Items</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders[:20] %}
+                                <tr>
+                                    <td><strong>{{ order.order_number }}</strong></td>
+                                    <td>{{ order.customer.full_name }}</td>
+                                    <td>{{ order.created_at.strftime('%d %b, %I:%M %p') }}</td>
+                                    <td>{{ order.order_items|length }} items</td>
+                                    <td><strong>₹{{ "%.2f"|format(order.total_amount) }}</strong></td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if order.order_status == 'picked_up' %}bg-success
+                                            {% elif order.order_status == 'ready' %}bg-info
+                                            {% elif order.order_status == 'preparing' %}bg-warning
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ order.order_status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if order.payment_status == 'paid' %}bg-success
+                                            {% elif order.payment_status == 'cod' %}bg-warning
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ order.payment_method|upper }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Peak Hours Chart
+const peakHoursCtx = document.getElementById('peakHoursChart').getContext('2d');
+const peakHoursData = {{ peak_hours_data|tojson }};
+
+new Chart(peakHoursCtx, {
+    type: 'line',
+    data: {
+        labels: peakHoursData.map(d => d.hour + ':00'),
+        datasets: [{
+            label: 'Orders',
+            data: peakHoursData.map(d => d.count),
+            borderColor: 'rgba(99, 102, 241, 1)',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: 'rgba(99, 102, 241, 1)',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: { size: 14 },
+                bodyFont: { size: 13 }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { stepSize: 1 },
+                grid: { color: 'rgba(0, 0, 0, 0.05)' }
+            },
+            x: {
+                grid: { display: false }
+            }
+        }
+    }
+});
+
+// Top Items Chart
+const topItemsCtx = document.getElementById('topItemsChart').getContext('2d');
+const popularItems = {{ popular_items|tojson }};
+
+new Chart(topItemsCtx, {
+    type: 'doughnut',
+    data: {
+        labels: popularItems.slice(0, 5).map(item => item.name),
+        datasets: [{
+            data: popularItems.slice(0, 5).map(item => item.total_sold),
+            backgroundColor: [
+                'rgba(99, 102, 241, 0.8)',
+                'rgba(139, 92, 246, 0.8)',
+                'rgba(16, 185, 129, 0.8)',
+                'rgba(245, 158, 11, 0.8)',
+                'rgba(239, 68, 68, 0.8)'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 15,
+                    font: { size: 11 }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

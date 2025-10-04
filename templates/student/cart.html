@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Cart - SkipTheQueue{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-cart"></i> Your Cart</h2>
+
+{% if cart %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                {% for item_id, item in cart.items() %}
+                <div class="d-flex justify-content-between align-items-center border-bottom py-3" id="cart-item-{{ item_id }}">
+                    <div>
+                        <h5>{{ item.name }}</h5>
+                        <p class="text-muted mb-0">₹{{ "%.2f"|format(item.price) }} each</p>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="btn-group me-3">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="updateCart('{{ item_id }}', 'decrease')">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                            <span class="btn btn-sm btn-outline-secondary disabled" id="qty-{{ item_id }}">
+                                {{ item.quantity }}
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="updateCart('{{ item_id }}', 'increase')">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                        <strong class="me-3" id="subtotal-{{ item_id }}">
+                            ₹{{ "%.2f"|format(item.price * item.quantity) }}
+                        </strong>
+                        <button class="btn btn-sm btn-danger" onclick="updateCart('{{ item_id }}', 'remove')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm sticky-top" style="top: 20px;">
+            <div class="card-body">
+                <h5 class="card-title">Order Summary</h5>
+                <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal</span>
+                    <strong id="cart-total">₹{{ "%.2f"|format(total) }}</strong>
+                </div>
+                <hr>
+                
+                <form method="POST" action="{{ url_for('checkout') }}">
+                    <div class="mb-3">
+                        <label class="form-label">Pickup Time</label>
+                        <select class="form-select" name="pickup_time" required>
+                            <option value="">Select time slot</option>
+                            {% for slot in time_slots %}
+                            <option value="{{ slot }}">{{ slot }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Available slots starting 10 min from now</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Special Instructions</label>
+                        <textarea class="form-control" name="special_instructions" rows="2" 
+                                  placeholder="Any special requests?"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="payment_method" 
+                                   id="online" value="online" checked>
+                            <label class="form-check-label" for="online">
+                                <i class="bi bi-credit-card"></i> Pay Online (Razorpay)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="payment_method" 
+                                   id="cod" value="cod">
+                            <label class="form-check-label" for="cod">
+                                <i class="bi bi-cash"></i> Cash on Delivery
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-circle"></i> Proceed to Checkout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-cart-x display-1 text-muted"></i>
+    <h3 class="mt-3">Your cart is empty</h3>
+    <p class="text-muted">Add some delicious items to get started!</p>
+    <a href="{{ url_for('student_home') }}" class="btn btn-primary">
+        <i class="bi bi-arrow-left"></i> Browse Menu
+    </a>
+</div>
+{% endif %}
+
+<script>
+function updateCart(itemId, action) {
+    fetch('/student/update-cart', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            item_id: itemId,
+            action: action
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (action === 'remove' || (action === 'decrease' && document.getElementById('qty-' + itemId).textContent == '1')) {
+                document.getElementById('cart-item-' + itemId).remove();
+            }
+            document.getElementById('cart-total').textContent = '₹' + data.total.toFixed(2);
+            document.getElementById('cart-count').textContent = data.cart_count;
+            
+            if (data.cart_count === 0) {
+                location.reload();
+            } else {
+                location.reload();
+            }
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+</script>
+{% endblock %}

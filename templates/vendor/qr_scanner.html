@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}QR Scanner - SkipTheQueue{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center animate-fadeIn">
+    <div class="col-lg-8">
+        <div class="text-center mb-4">
+            <h2 class="text-gradient"><i class="bi bi-qr-code-scan"></i> Scan Order QR Code</h2>
+            <p class="text-muted">Point camera at student's QR code to confirm pickup</p>
+        </div>
+
+        <!-- Tabs for Scanner and Manual -->
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="scanner-tab" data-bs-toggle="tab" data-bs-target="#scanner" type="button">
+                    <i class="bi bi-camera"></i> Camera Scanner
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button">
+                    <i class="bi bi-keyboard"></i> Manual Entry
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- Camera Scanner Tab -->
+            <div class="tab-pane fade show active" id="scanner" role="tabpanel">
+                <div class="qr-scanner-container">
+                    <div id="reader" style="width: 100%;"></div>
+                    
+                    <div class="mt-4 text-center">
+                        <button id="startScanBtn" class="btn btn-primary btn-lg">
+                            <i class="bi bi-camera-fill"></i> Start Scanning
+                        </button>
+                        <button id="stopScanBtn" class="btn btn-danger btn-lg" style="display: none;">
+                            <i class="bi bi-stop-circle"></i> Stop Scanning
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Entry Tab -->
+            <div class="tab-pane fade" id="manual" role="tabpanel">
+                <div class="card">
+                    <div class="card-body p-4">
+                        <h5 class="mb-3">Enter Order Number</h5>
+                        <form id="manualVerifyForm">
+                            <div class="mb-3">
+                                <label for="orderNumber" class="form-label">Order Number</label>
+                                <input type="text" class="form-control form-control-lg" id="orderNumber" 
+                                       placeholder="ORD20250104..." required>
+                                <small class="text-muted">Enter the order number from student's screen</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg w-100">
+                                <i class="bi bi-check-circle"></i> Verify Order
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Display -->
+        <div id="scanResult" class="mt-4" style="display: none;">
+            <div class="alert alert-success scan-success">
+                <h5><i class="bi bi-check-circle-fill"></i> Pickup Confirmed!</h5>
+                <div id="orderDetails"></div>
+            </div>
+        </div>
+
+        <div id="scanError" class="mt-4" style="display: none;">
+            <div class="alert alert-danger">
+                <h5><i class="bi bi-x-circle-fill"></i> Error</h5>
+                <p id="errorMessage"></p>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6><i class="bi bi-info-circle text-primary"></i> Instructions</h6>
+                <ul class="mb-0">
+                    <li><strong>Camera Scanner:</strong> Click "Start Scanning" and point at QR code</li>
+                    <li><strong>Manual Entry:</strong> Type the order number if camera doesn't work</li>
+                    <li>Order status will update immediately after verification</li>
+                    <li>Student will receive confirmation notification</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let html5QrCode;
+let isScanning = false;
+
+document.getElementById('startScanBtn').addEventListener('click', startScanning);
+document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
+document.getElementById('manualVerifyForm').addEventListener('submit', manualVerify);
+
+function startScanning() {
+    html5QrCode = new Html5Qrcode("reader");
+    
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+    };
+    
+    html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanError
+    ).then(() => {
+        isScanning = true;
+        document.getElementById('startScanBtn').style.display = 'none';
+        document.getElementById('stopScanBtn').style.display = 'inline-block';
+        document.getElementById('scanResult').style.display = 'none';
+        document.getElementById('scanError').style.display = 'none';
+    }).catch(err => {
+        console.error('Camera error:', err);
+        showError('Unable to access camera. Please try manual entry or check camera permissions.');
+    });
+}
+
+function stopScanning() {
+    if (html5QrCode && isScanning) {
+        html5QrCode.stop().then(() => {
+            isScanning = false;
+            document.getElementById('startScanBtn').style.display = 'inline-block';
+            document.getElementById('stopScanBtn').style.display = 'none';
+        });
+    }
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+    if (!isScanning) return;
+    
+    console.log('QR Code scanned:', decodedText);
+    
+    // Stop scanning immediately
+    stopScanning();
+    
+    // Process the QR code
+    processQRCode(decodedText);
+}
+
+function onScanError(error) {
+    // Ignore scan errors (they happen frequently during scanning)
+}
+
+function manualVerify(e) {
+    e.preventDefault();
+    const orderNumber = document.getElementById('orderNumber').value.trim();
+    
+    if (!orderNumber) {
+        showError('Please enter an order number');
+        return;
+    }
+    
+    // For manual entry, we need to fetch the order by order number
+    fetch('/vendor/verify-order-manual', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ order_number: orderNumber })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('orderDetails').innerHTML = `
+                <p><strong>Order Number:</strong> ${data.order.order_number}</p>
+                <p><strong>Customer:</strong> ${data.order.customer_name}</p>
+                <p><strong>Amount:</strong> ₹${data.order.total_amount.toFixed(2)}</p>
+            `;
+            document.getElementById('scanResult').style.display = 'block';
+            document.getElementById('scanError').style.display = 'none';
+            document.getElementById('orderNumber').value = '';
+            
+            playSuccessSound();
+            
+            setTimeout(() => {
+                document.getElementById('scanResult').style.display = 'none';
+            }, 5000);
+        } else {
+            showError(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Verification error:', error);
+        showError('Network error. Please try again.');
+    });
+}
+
+function processQRCode(qrData) {
+    fetch('/vendor/scan-qr', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ qr_data: qrData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('orderDetails').innerHTML = `
+                <p><strong>Order Number:</strong> ${data.order.order_number}</p>
+                <p><strong>Customer:</strong> ${data.order.customer_name}</p>
+                <p><strong>Amount:</strong> ₹${data.order.total_amount.toFixed(2)}</p>
+            `;
+            document.getElementById('scanResult').style.display = 'block';
+            document.getElementById('scanError').style.display = 'none';
+            
+            playSuccessSound();
+            
+            setTimeout(() => {
+                document.getElementById('scanResult').style.display = 'none';
+            }, 5000);
+        } else {
+            showError(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Processing error:', error);
+        showError('Network error. Please try again.');
+    });
+}
+
+function showError(message) {
+    document.getElementById('errorMessage').textContent = message;
+    document.getElementById('scanError').style.display = 'block';
+    document.getElementById('scanResult').style.display = 'none';
+    
+    setTimeout(() => {
+        document.getElementById('scanError').style.display = 'none';
+    }, 5000);
+}
+
+function playSuccessSound() {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKXh8LJnHgU2jdXvx3ElBSl+zPDcijQIHGy+8OSYTgwPUKPg7bZoHwU3jtTvxnEmBSp9y/DajDMIG2q98OOZTAwOT6Lf7bVpIAU4j9Tvw3AlBSt8yvLaiDUIHGy+7+SYTgwOUKHe7bZnIAY4jdXu');
+    audio.play().catch(e => console.log('Audio play failed'));
+}
+</script>
+{% endblock %}

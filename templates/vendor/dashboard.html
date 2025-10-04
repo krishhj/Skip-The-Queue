@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Dashboard - SkipTheQueue{% endblock %}
+
+{% block content %}
+<div class="animate-fadeIn">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-gradient"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('qr_scanner') }}" class="btn btn-primary">
+                <i class="bi bi-qr-code-scan"></i> Scan QR
+            </a>
+            <a href="{{ url_for('slot_management') }}" class="btn btn-outline-primary">
+                <i class="bi bi-clock"></i> Manage Slots
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card animate-scaleIn" style="animation-delay: 0.1s">
+                <div class="stats-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="stats-value text-danger">{{ pending_orders }}</div>
+                <div class="stats-label">Pending Orders</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card animate-scaleIn" style="animation-delay: 0.2s">
+                <div class="stats-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--info);">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                <div class="stats-value text-primary">{{ today_orders }}</div>
+                <div class="stats-label">Today's Orders</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card animate-scaleIn" style="animation-delay: 0.3s">
+                <div class="stats-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">
+                    <i class="bi bi-currency-rupee"></i>
+                </div>
+                <div class="stats-value text-success">₹{{ "%.0f"|format(today_revenue) }}</div>
+                <div class="stats-label">Today's Revenue</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card animate-scaleIn" style="animation-delay: 0.4s">
+                <div class="stats-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--secondary);">
+                    <i class="bi bi-menu-button-wide"></i>
+                </div>
+                <div class="stats-value" style="color: var(--secondary);">{{ menu_items }}</div>
+                <div class="stats-label">Menu Items</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Low Stock Alerts -->
+    {% if low_stock_items %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Low Stock Alerts</h5>
+            {% for item in low_stock_items %}
+            <div class="low-stock-alert animate-slideInLeft">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-3">
+                        <i class="bi bi-box-seam"></i>
+                        <div>
+                            <strong>{{ item.name }}</strong>
+                            <p class="mb-0 small">{{ item.ordered }} orders today (threshold: {{ item.threshold }})</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-warning">Action Needed</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4 mb-4">
+        <!-- Peak Hours Chart -->
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <h5 class="chart-title"><i class="bi bi-graph-up"></i> Peak Hours Today</h5>
+                <canvas id="peakHoursChart" height="80"></canvas>
+            </div>
+        </div>
+
+        <!-- Slot Utilization -->
+        <div class="col-lg-4">
+            <div class="card gradient-card-1">
+                <div class="card-body text-center">
+                    <i class="bi bi-pie-chart display-4 mb-3"></i>
+                    <h3>Slot Utilization</h3>
+                    <div class="my-4">
+                        <div class="impact-number" style="color: white;">{{ slot_stats.utilization }}%</div>
+                    </div>
+                    <div class="d-flex justify-content-around text-white">
+                        <div>
+                            <h4>{{ slot_stats.booked }}</h4>
+                            <small>Booked</small>
+                        </div>
+                        <div>
+                            <h4>{{ slot_stats.total }}</h4>
+                            <small>Total</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sustainability Impact -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="sustainability-card">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center">
+                        <div class="sustainability-icon mx-auto">
+                            <i class="bi bi-recycle"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <h4 class="mb-2" style="color: #065f46;">🌱 Sustainability Impact</h4>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="impact-number">{{ waste_prevented.today_kg_saved }}</div>
+                                <div class="impact-label">kg waste prevented today</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="impact-number">{{ waste_prevented.today_orders }}</div>
+                                <div class="impact-label">pre-orders today</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="impact-number">{{ waste_prevented.total_kg_saved }}</div>
+                                <div class="impact-label">total kg saved</div>
+                            </div>
+                        </div>
+                        <p class="mt-3 mb-0 small" style="color: #047857;">
+                            Smart scheduling helps prepare exact quantities, reducing stale food and leftovers
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Quick Actions</h5>
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('vendor_orders') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3">
+                            <i class="bi bi-list-check text-primary fs-4"></i>
+                            <div class="flex-grow-1">
+                                <strong>View All Orders</strong>
+                                <p class="mb-0 small text-muted">Manage and update order status</p>
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                        <a href="{{ url_for('vendor_menu') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3">
+                            <i class="bi bi-menu-button-wide text-success fs-4"></i>
+                            <div class="flex-grow-1">
+                                <strong>Manage Menu</strong>
+                                <p class="mb-0 small text-muted">Add, edit or toggle item availability</p>
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                        <a href="{{ url_for('vendor_analytics') }}" class="list-group-item list-group-item-action d-flex align-items-center gap-3">
+                            <i class="bi bi-graph-up text-info fs-4"></i>
+                            <div class="flex-grow-1">
+                                <strong>View Analytics</strong>
+                                <p class="mb-0 small text-muted">Detailed reports and insights</p>
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const socket = io();
+socket.on('connect', function() {
+    console.log('Connected to WebSocket');
+});
+
+socket.on('new_order', function(data) {
+    showToast('New order received: ' + data.order_number, 'success');
+    setTimeout(() => location.reload(), 2000);
+});
+
+socket.on('slot_capacity_warning', function(data) {
+    showToast(data.message, 'warning');
+});
+
+// Peak Hours Chart
+const ctx = document.getElementById('peakHoursChart').getContext('2d');
+const peakHoursData = {{ peak_hours|tojson }};
+const hours = Object.keys(peakHoursData);
+const counts = Object.values(peakHoursData);
+
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: hours.map(h => h + ':00'),
+        datasets: [{
+            label: 'Orders',
+            data: counts,
+            backgroundColor: 'rgba(99, 102, 241, 0.6)',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 2,
+            borderRadius: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+
+function showToast(message, type) {
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast toast-${type} show`;
+    toastEl.innerHTML = `
+        <div class="toast-body d-flex align-items-center gap-2">
+            <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} fs-5"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    document.getElementById('toastContainer').appendChild(toastEl);
+    setTimeout(() => toastEl.remove(), 5000);
+}
+</script>
+{% endblock %}

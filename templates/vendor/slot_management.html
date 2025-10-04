@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Slot Management - SkipTheQueue{% endblock %}
+
+{% block content %}
+<div class="animate-fadeIn">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-gradient"><i class="bi bi-clock"></i> Slot Management</h2>
+        <a href="{{ url_for('vendor_dashboard') }}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> <strong>Manage your time slots:</strong> Adjust capacity or mark slots as unavailable (blackout)
+    </div>
+
+    <div class="row">
+        {% for slot in time_slots %}
+        <div class="col-lg-6 mb-3">
+            <div class="slot-control">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0"><i class="bi bi-clock-fill text-primary"></i> {{ slot }}</h5>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" 
+                               id="blackout_{{ slot }}"
+                               {% if slot in slot_config and slot_config[slot].get('blackout', False) %}checked{% endif %}
+                               onchange="toggleBlackout('{{ slot }}', this.checked)">
+                        <label class="form-check-label" for="blackout_{{ slot }}">
+                            Unavailable
+                        </label>
+                    </div>
+                </div>
+
+                <div id="capacity_control_{{ slot }}" 
+                     {% if slot in slot_config and slot_config[slot].get('blackout', False) %}style="display:none;"{% endif %}>
+                    <label class="form-label">Capacity: 
+                        <span id="capacity_value_{{ slot }}" class="text-primary fw-bold">
+                            {{ slot_config[slot].capacity if slot in slot_config and 'capacity' in slot_config[slot] else 20 }}
+                        </span>
+                    </label>
+                    <input type="range" 
+                           class="capacity-slider" 
+                           min="5" 
+                           max="50" 
+                           value="{{ slot_config[slot].capacity if slot in slot_config and 'capacity' in slot_config[slot] else 20 }}"
+                           oninput="updateCapacity('{{ slot }}', this.value)">
+                    <div class="d-flex justify-content-between text-muted small mt-1">
+                        <span>5 orders</span>
+                        <span>50 orders</span>
+                    </div>
+                </div>
+
+                <div id="blackout_message_{{ slot }}" 
+                     {% if not (slot in slot_config and slot_config[slot].get('blackout', False)) %}style="display:none;"{% endif %}
+                     class="text-center text-muted">
+                    <i class="bi bi-x-circle"></i> This slot is marked as unavailable
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+function updateCapacity(slot, value) {
+    document.getElementById('capacity_value_' + slot).textContent = value;
+    
+    // Debounce API call
+    clearTimeout(window.capacityTimeout);
+    window.capacityTimeout = setTimeout(() => {
+        saveSlotConfig(slot, { capacity: parseInt(value) });
+    }, 500);
+}
+
+function toggleBlackout(slot, isBlackedOut) {
+    const capacityControl = document.getElementById('capacity_control_' + slot);
+    const blackoutMessage = document.getElementById('blackout_message_' + slot);
+    
+    if (isBlackedOut) {
+        capacityControl.style.display = 'none';
+        blackoutMessage.style.display = 'block';
+    } else {
+        capacityControl.style.display = 'block';
+        blackoutMessage.style.display = 'none';
+    }
+    
+    saveSlotConfig(slot, { blackout: isBlackedOut });
+}
+
+function saveSlotConfig(slot, config) {
+    fetch('/vendor/update-slot-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            slot_time: slot,
+            ...config
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Slot configuration updated', 'success');
+        } else {
+            showToast('Failed to update slot', 'danger');
+        }
+    })
+    .catch(error => {
+        showToast('Network error', 'danger');
+    });
+}
+
+function showToast(message, type) {
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast toast-${type} show`;
+    toastEl.innerHTML = `
+        <div class="toast-body d-flex align-items-center gap-2">
+            <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} fs-5"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    document.getElementById('toastContainer').appendChild(toastEl);
+    setTimeout(() => toastEl.remove(), 3000);
+}
+</script>
+{% endblock %}
